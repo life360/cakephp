@@ -359,7 +359,9 @@ class ExtractTask extends AppShell {
 			}
 			unset($allTokens);
 			$this->_parse('__', array('singular'));
-			$this->_parse('__n', array('singular', 'plural'));
+            $this->_parse('__DelayedTranslation', array('singular'));
+            $this->_parse('__exceptionTranslation', array('singular'));
+            $this->_parse('__n', array('singular', 'plural'));
 			$this->_parse('__d', array('domain', 'singular'));
 			$this->_parse('__c', array('singular'));
 			$this->_parse('__dc', array('domain', 'singular'));

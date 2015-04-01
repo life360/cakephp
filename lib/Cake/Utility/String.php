@@ -33,70 +33,72 @@ class String {
  * @return RFC 4122 UUID
  */
 	public static function uuid() {
-		$node = env('SERVER_ADDR');
+		return String::uuid4();
+	}
 
-		if (strpos($node, ':') !== false) {
-			if (substr_count($node, '::')) {
-				$node = str_replace(
-					'::', str_repeat(':0000', 8 - substr_count($node, ':')) . ':', $node
-				);
-			}
-			$node = explode(':', $node);
-			$ipSix = '';
+	public static function uuid4() {
+		$test = false;
+		$pr_bits = openssl_random_pseudo_bytes(64, $test);
+		$pr_bits = substr($pr_bits, 32, 16);
 
-			foreach ($node as $id) {
-				$ipSix .= str_pad(base_convert($id, 16, 2), 16, 0, STR_PAD_LEFT);
-			}
-			$node = base_convert($ipSix, 2, 10);
+		$time_low = bin2hex(substr($pr_bits,0, 4));
+		$time_mid = bin2hex(substr($pr_bits,4, 2));
+		$time_hi_and_version = bin2hex(substr($pr_bits,6, 2));
+		$clock_seq_hi_and_reserved = bin2hex(substr($pr_bits,8, 2));
+		$node = bin2hex(substr($pr_bits,10, 6));
 
-			if (strlen($node) < 38) {
-				$node = null;
-			} else {
-				$node = crc32($node);
-			}
-		} elseif (empty($node)) {
-			$host = env('HOSTNAME');
+		/**
+		 * Set the four most significant bits (bits 12 through 15) of the
+		 * time_hi_and_version field to the 4-bit version number from
+		 * Section 4.1.3.
+		 * @see http://tools.ietf.org/html/rfc4122#section-4.1.3
+		 */
+		$time_hi_and_version = hexdec($time_hi_and_version);
+		$time_hi_and_version = $time_hi_and_version >> 4;
+		$time_hi_and_version = $time_hi_and_version | 0x4000;
 
-			if (empty($host)) {
-				$host = env('HOST');
-			}
+		/**
+		 * Set the two most significant bits (bits 6 and 7) of the
+		 * clock_seq_hi_and_reserved to zero and one, respectively.
+		 */
+		$clock_seq_hi_and_reserved = hexdec($clock_seq_hi_and_reserved);
+		$clock_seq_hi_and_reserved = $clock_seq_hi_and_reserved >> 2;
+		$clock_seq_hi_and_reserved = $clock_seq_hi_and_reserved | 0x8000;
 
-			if (!empty($host)) {
-				$ip = gethostbyname($host);
+		return sprintf('%08s-%04s-%04x-%04x-%012s',
+			$time_low, $time_mid, $time_hi_and_version, $clock_seq_hi_and_reserved, $node);
+	}
 
-				if ($ip === $host) {
-					$node = crc32($host);
-				} else {
-					$node = ip2long($ip);
-				}
-			}
-		} elseif ($node !== '127.0.0.1') {
-			$node = ip2long($node);
-		} else {
-			$node = null;
+	public static function uuid5($ns, $name) {
+		$version = 5;
+		$bytes = '';
+		$hex = str_replace('-', '', $ns);
+
+		foreach (range(-2, -32, 2) as $step) {
+			$bytes = chr(hexdec(substr($hex, $step, 2))) . $bytes;
 		}
 
-		if (empty($node)) {
-			$node = crc32(Configure::read('Security.salt'));
-		}
+		$hash = sha1($bytes . $name);
 
-		if (function_exists('hphp_get_thread_id')) {
-			$pid = hphp_get_thread_id();
-		} elseif (function_exists('zend_thread_id')) {
-			$pid = zend_thread_id();
-		} else {
-			$pid = getmypid();
-		}
+		// Set the version number
+		$timeHi = hexdec(substr($hash, 12, 4)) & 0x0fff;
+		$timeHi &= ~(0xf000);
+		$timeHi |= $version << 12;
 
-		if (!$pid || $pid > 65535) {
-			$pid = mt_rand(0, 0xfff) | 0x4000;
-		}
+		// Set the variant to RFC 4122
+		$clockSeqHi = hexdec(substr($hash, 16, 2)) & 0x3f;
+		$clockSeqHi &= ~(0xc0);
+		$clockSeqHi |= 0x80;
 
-		list($timeMid, $timeLow) = explode(' ', microtime());
-		return sprintf(
-			"%08x-%04x-%04x-%02x%02x-%04x%08x", (int)$timeLow, (int)substr($timeMid, 2) & 0xffff,
-			mt_rand(0, 0xfff) | 0x4000, mt_rand(0, 0x3f) | 0x80, mt_rand(0, 0xff), $pid, $node
-		);
+		$time_low = substr($hash, 0, 8);
+		$time_mid = substr($hash, 8, 4);
+		$time_hi_and_version = sprintf('%04x', $timeHi);
+		$clock_seq_hi_and_reserved = sprintf('%02x', $clockSeqHi);
+		$clock_seq_low = substr($hash, 18, 2);
+		$node = substr($hash, 20, 12);
+
+		return sprintf('%08s-%04s-%04s-%02s%02s-%012s',
+			$time_low, $time_mid, $time_hi_and_version, $clock_seq_hi_and_reserved, $clock_seq_low, $node);
 	}
 
 /**

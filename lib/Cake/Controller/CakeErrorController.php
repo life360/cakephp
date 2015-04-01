@@ -68,4 +68,7 @@ class CakeErrorController extends AppController {
 		$this->_set(array('cacheAction' => false, 'viewPath' => 'Errors'));
 	}
 
+	public function beforeFilter() {
+		//We need this to stop our own AppController beforeFilter from running.
+	}
 }

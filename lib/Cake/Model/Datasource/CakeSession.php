@@ -551,7 +551,6 @@ class CakeSession {
 					'session.serialize_handler' => 'php',
 					'session.use_cookies' => 1,
 					'session.cookie_path' => self::$path,
-					'session.auto_start' => 0,
 					'session.save_path' => TMP . 'sessions',
 					'session.save_handler' => 'files'
 				)
@@ -562,7 +561,6 @@ class CakeSession {
 				'ini' => array(
 					'session.use_trans_sid' => 0,
 					'url_rewriter.tags' => '',
-					'session.auto_start' => 0,
 					'session.use_cookies' => 1,
 					'session.cookie_path' => self::$path,
 					'session.save_handler' => 'user',
@@ -578,7 +576,6 @@ class CakeSession {
 				'ini' => array(
 					'session.use_trans_sid' => 0,
 					'url_rewriter.tags' => '',
-					'session.auto_start' => 0,
 					'session.use_cookies' => 1,
 					'session.cookie_path' => self::$path,
 					'session.save_handler' => 'user',

@@ -18,7 +18,7 @@
  * @license       MIT License (http://www.opensource.org/licenses/mit-license.php)
  */
 
-require_once 'PHPUnit/TextUI/Command.php';
+//require_once 'PHPUnit/TextUI/Command.php';
 
 App::uses('CakeTestRunner', 'TestSuite');
 App::uses('CakeTestLoader', 'TestSuite');
@@ -46,7 +46,8 @@ class CakeTestSuiteCommand extends PHPUnit_TextUI_Command {
 			throw new MissingTestLoaderException(array('class' => $loader));
 		}
 		$this->arguments['loader'] = $loader;
-		$this->arguments['test'] = $params['case'];
+        // this will evaluate to null anyway if case doesn't exist, but it will suppress a very common error
+		$this->arguments['test'] = isset($params['case']) ? $params['case'] : null;
 		$this->arguments['testFile'] = $params;
 		$this->_params = $params;
 
