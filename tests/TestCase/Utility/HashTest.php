@@ -210,6 +210,9 @@ class HashTest extends TestCase
         $result = Hash::get($data, '');
         $this->assertNull($result);
 
+        $result = Hash::get($data, null, '-');
+        $this->assertSame('-', $result);
+
         $result = Hash::get($data, '0.Article.title');
         $this->assertEquals('First Article', $result);
 
@@ -840,6 +843,33 @@ class HashTest extends TestCase
 
         $result = Hash::extract($data, '{n}.{s}.Nesting.test.1');
         $this->assertEquals(['foo'], $result);
+    }
+
+    /**
+     * Test wildcard matcher
+     *
+     * @return void
+     */
+    public function testExtractWildcard()
+    {
+        $data = [
+            '02000009C5560001' => ['name' => 'Mr. Alphanumeric'],
+            '2300000918020101' => ['name' => 'Mr. Numeric'],
+            '390000096AB30001' => ['name' => 'Mrs. Alphanumeric'],
+            'stuff' => ['name' => 'Ms. Word'],
+            123 => ['name' => 'Mr. Number'],
+            true => ['name' => 'Ms. Bool'],
+        ];
+        $result = Hash::extract($data, '{*}.name');
+        $expected = [
+            'Mr. Alphanumeric',
+            'Mr. Numeric',
+            'Mrs. Alphanumeric',
+            'Ms. Word',
+            'Mr. Number',
+            'Ms. Bool',
+        ];
+        $this->assertEquals($expected, $result);
     }
 
     /**

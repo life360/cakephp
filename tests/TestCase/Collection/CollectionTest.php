@@ -1163,4 +1163,86 @@ class CollectionTest extends TestCase
 
         $this->assertEquals([1, 2, 3, 1, 2, 3], $collection->toList());
     }
+
+    /**
+     * Tests that the sortBy method does not die when something that is not a
+     * collection is passed
+     *
+     * @return void
+     */
+    public function testComplexSortBy()
+    {
+        $results = collection([3, 7])
+            ->unfold(function ($value) {
+                return [
+                    ['sorting' => $value * 2],
+                    ['sorting' => $value * 2]
+                ];
+            })
+            ->sortBy('sorting')
+            ->extract('sorting')
+            ->toList();
+        $this->assertEquals([14, 14, 6, 6], $results);
+    }
+
+    /**
+     * Tests __debugInfo() or debug() usage
+     *
+     * @return void
+     */
+    public function testDebug()
+    {
+        $items = [1, 2, 3];
+
+        $collection = new Collection($items);
+
+        $result = $collection->__debugInfo();
+        $expected = [
+            'count' => 3,
+        ];
+        $this->assertSame($expected, $result);
+
+        // Calling it again will rewind
+        $result = $collection->__debugInfo();
+        $expected = [
+            'count' => 3,
+        ];
+        $this->assertSame($expected, $result);
+
+        // Make sure it also works with non rewindable iterators
+        $iterator = new NoRewindIterator(new ArrayIterator($items));
+        $collection = new Collection($iterator);
+
+        $result = $collection->__debugInfo();
+        $expected = [
+            'count' => 3,
+        ];
+        $this->assertSame($expected, $result);
+
+        // Calling it again will in this case not rewind
+        $result = $collection->__debugInfo();
+        $expected = [
+            'count' => 0,
+        ];
+        $this->assertSame($expected, $result);
+    }
+
+    /**
+     * Tests the isEmpty() method
+     *
+     * @return void
+     */
+    public function testIsEmpty()
+    {
+        $collection = new Collection([1, 2, 3]);
+        $this->assertFalse($collection->isEmpty());
+
+        $collection = $collection->map(function () {
+            return null;
+        });
+        $this->assertFalse($collection->isEmpty());
+
+        $collection = $collection->filter();
+        $this->assertTrue($collection->isEmpty());
+    }
 }

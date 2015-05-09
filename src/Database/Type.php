@@ -15,6 +15,7 @@
 namespace Cake\Database;
 
 use Cake\Database\Driver;
+use InvalidArgumentException;
 use PDO;
 
 /**
@@ -99,9 +100,21 @@ class Type
             return static::$_builtTypes[$name] = new static($name);
         }
         if (!isset(static::$_types[$name])) {
-            throw new \InvalidArgumentException(sprintf('Unknown type "%s"', $name));
+            throw new InvalidArgumentException(sprintf('Unknown type "%s"', $name));
         }
         return static::$_builtTypes[$name] = new static::$_types[$name]($name);
+    }
+
+    /**
+     * Returns a Type object capable of converting a type identified by $name
+     *
+     * @param string $name The type identifier you want to set.
+     * @param \Cake\Databse\Type $instance The type instance you want to set.
+     * @return void
+     */
+    public static function set($name, Type $instance)
+    {
+        static::$_builtTypes[$name] = $instance;
     }
 
     /**

@@ -681,6 +681,12 @@ class ViewTest extends TestCase
         $result = $View->getLayoutFileName();
         $this->assertPathEquals($expected, $result);
 
+        $View->request->params['prefix'] = 'foo_prefix/bar_prefix';
+        $expected = TEST_APP . 'TestApp' . DS . 'Template' . DS .
+            'FooPrefix' . DS . 'Layout' . DS . 'nested_prefix_cascade.ctp';
+        $result = $View->getLayoutFileName('nested_prefix_cascade');
+        $this->assertPathEquals($expected, $result);
+
         // Fallback to app's layout
         $View->request->params['prefix'] = 'Admin';
         $expected = TEST_APP . 'TestApp' . DS . 'Template' . DS .
@@ -814,6 +820,33 @@ class ViewTest extends TestCase
         $this->View->plugin = 'TestPlugin';
         $result = $this->View->element('test_plugin_element');
         $this->assertEquals('this is the test set using View::$plugin plugin element', $result);
+    }
+
+    /**
+     * Test element method with a prefix
+     *
+     * @return void
+     */
+    public function testPrefixElement()
+    {
+        $this->View->request->params['prefix'] = 'Admin';
+        $result = $this->View->element('prefix_element');
+        $this->assertEquals('this is a prefixed test element', $result);
+
+        $result = $this->View->element('TestPlugin.plugin_element');
+        $this->assertEquals('this is the plugin prefixed element using params[plugin]', $result);
+
+        $this->View->plugin = 'TestPlugin';
+        $result = $this->View->element('test_plugin_element');
+        $this->assertEquals('this is the test set using View::$plugin plugin prefixed element', $result);
+
+        $this->View->request->params['prefix'] = 'FooPrefix/BarPrefix';
+        $result = $this->View->element('prefix_element');
+        $this->assertEquals('this is a nested prefixed test element', $result);
+
+        $this->View->request->params['prefix'] = 'FooPrefix/BarPrefix';
+        $result = $this->View->element('prefix_element_in_parent');
+        $this->assertEquals('this is a nested prefixed test element in first level element', $result);
     }
 
     /**
@@ -1146,7 +1179,6 @@ class ViewTest extends TestCase
     public function testBeforeLayout()
     {
         $this->PostsController->helpers = [
-            'Session',
             'TestBeforeAfter' => ['className' => __NAMESPACE__ . '\TestBeforeAfterHelper'],
             'Html'
         ];
@@ -1163,7 +1195,6 @@ class ViewTest extends TestCase
     public function testAfterLayout()
     {
         $this->PostsController->helpers = [
-            'Session',
             'TestBeforeAfter' => ['className' => __NAMESPACE__ . '\TestBeforeAfterHelper'],
             'Html'
         ];
@@ -1184,7 +1215,7 @@ class ViewTest extends TestCase
      */
     public function testRenderLoadHelper()
     {
-        $this->PostsController->helpers = ['Session', 'Form', 'Number'];
+        $this->PostsController->helpers = ['Form', 'Number'];
         $View = $this->PostsController->createView('Cake\Test\TestCase\View\TestView');
 
         $result = $View->render('index', false);
@@ -1192,7 +1223,7 @@ class ViewTest extends TestCase
 
         $attached = $View->helpers()->loaded();
         // HtmlHelper is loaded in TestView::initialize()
-        $this->assertEquals(['Html', 'Session', 'Form', 'Number'], $attached);
+        $this->assertEquals(['Html', 'Form', 'Number'], $attached);
 
         $this->PostsController->helpers = ['Html', 'Form', 'Number', 'TestPlugin.PluggedHelper'];
         $View = $this->PostsController->createView('Cake\Test\TestCase\View\TestView');
@@ -1226,7 +1257,7 @@ class ViewTest extends TestCase
 
         $this->assertNull($View->render(false, 'ajax2'));
 
-        $this->PostsController->helpers = ['Session', 'Html'];
+        $this->PostsController->helpers = ['Html'];
         $this->PostsController->request->params['action'] = 'index';
         Configure::write('Cache.check', true);
 
@@ -1279,7 +1310,7 @@ class ViewTest extends TestCase
     public function testViewVarOverwritingLocalHelperVar()
     {
         $Controller = new ViewPostsController();
-        $Controller->helpers = ['Session', 'Html'];
+        $Controller->helpers = ['Html'];
         $Controller->set('html', 'I am some test html');
         $View = $Controller->createView();
         $result = $View->render('helper_overwrite', false);
@@ -1715,6 +1746,26 @@ TEXT;
     }
 
     /**
+     * Test extend() in an element and a view.
+     *
+     * @return void
+     */
+    public function testExtendPrefixElement()
+    {
+        $this->View->request->params['prefix'] = 'Admin';
+        $this->View->layout = false;
+        $content = $this->View->render('extend_element');
+        $expected = <<<TEXT
+Parent View.
+View content.
+Parent Element.
+Prefix Element content.
+
+TEXT;
+        $this->assertEquals($expected, $content);
+    }
+
+    /**
      * Extending an element which doesn't exist should throw a missing view exception
      *
      * @return void
@@ -1744,6 +1795,24 @@ TEXT;
         $expected = <<<TEXT
 Parent View.
 this is the test elementThe view
+
+TEXT;
+        $this->assertEquals($expected, $result);
+    }
+
+    /**
+     * Test extend() preceeded by an element()
+     *
+     * @return void
+     */
+    public function testExtendWithPrefixElementBeforeExtend()
+    {
+        $this->View->request->params['prefix'] = 'Admin';
+        $this->View->layout = false;
+        $result = $this->View->render('extend_with_element');
+        $expected = <<<TEXT
+Parent View.
+this is the test prefix elementThe view
 
 TEXT;
         $this->assertEquals($expected, $result);

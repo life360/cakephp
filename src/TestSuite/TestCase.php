@@ -16,9 +16,11 @@ namespace Cake\TestSuite;
 use Cake\Core\App;
 use Cake\Core\Configure;
 use Cake\Datasource\ConnectionManager;
+use Cake\ORM\Exception\MissingTableClassException;
 use Cake\ORM\TableRegistry;
 use Cake\Routing\Router;
 use Cake\Utility\Inflector;
+use Exception;
 
 /**
  * Cake TestCase class
@@ -126,7 +128,7 @@ abstract class TestCase extends \PHPUnit_Framework_TestCase
     public function loadFixtures()
     {
         if (empty($this->fixtureManager)) {
-            throw new \Exception('No fixture manager to load the test fixture');
+            throw new Exception('No fixture manager to load the test fixture');
         }
         $args = func_get_args();
         foreach ($args as $class) {
@@ -581,7 +583,7 @@ abstract class TestCase extends \PHPUnit_Framework_TestCase
             $class = Inflector::camelize($alias);
             $className = App::className($class, 'Model/Table', 'Table');
             if (!$className) {
-                throw new \Cake\ORM\Exception\MissingTableClassException([$alias]);
+                throw new MissingTableClassException([$alias]);
             }
             $options['className'] = $className;
         }

@@ -13,6 +13,9 @@
  */
 namespace Cake\Utility;
 
+use InvalidArgumentException;
+use RuntimeException;
+
 /**
  * Library of array functions for manipulating and extracting data
  * from arrays or 'sets' of data.
@@ -42,7 +45,7 @@ class Hash
      */
     public static function get(array $data, $path, $default = null)
     {
-        if (empty($data)) {
+        if (empty($data) || $path === null || $path === '') {
             return $default;
         }
 
@@ -50,7 +53,7 @@ class Hash
             $parts = explode('.', $path);
         } else {
             if (!is_array($path)) {
-                throw new \InvalidArgumentException(sprintf(
+                throw new InvalidArgumentException(sprintf(
                     'Invalid Parameter %s, should be dot separated path or array.',
                     $path
                 ));
@@ -86,6 +89,7 @@ class Hash
      *
      * - `{n}` Matches any numeric key, or integer.
      * - `{s}` Matches any string key.
+     * - `{*}` Matches any value.
      * - `Foo` Matches any key with the exact same value.
      *
      * There are a number of attribute operators:
@@ -188,16 +192,16 @@ class Hash
      */
     protected static function _matchToken($key, $token)
     {
-        if ($token === '{n}') {
-            return is_numeric($key);
+        switch ($token) {
+            case '{n}':
+                return is_numeric($key);
+            case '{s}':
+                return is_string($key);
+            case '{*}':
+                return true;
+            default:
+                return is_numeric($token) ? ($key == $token) : $key === $token;
         }
-        if ($token === '{s}') {
-            return is_string($key);
-        }
-        if (is_numeric($token)) {
-            return ($key == $token);
-        }
-        return ($key === $token);
     }
 
     /**
@@ -444,7 +448,7 @@ class Hash
         }
 
         if (count($keys) !== count($vals)) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 'Hash::combine() needs an equal number of keys + values.'
             );
         }
@@ -848,11 +852,15 @@ class Hash
      * You can easily count the results of an extract using apply().
      * For example to count the comments on an Article:
      *
-     * `$count = Hash::apply($data, 'Article.Comment.{n}', 'count');`
+     * ```
+     * $count = Hash::apply($data, 'Article.Comment.{n}', 'count');
+     * ```
      *
      * You could also use a function like `array_sum` to sum the results.
      *
-     * `$total = Hash::apply($data, '{n}.Item.price', 'array_sum');`
+     * ```
+     * $total = Hash::apply($data, '{n}.Item.price', 'array_sum');
+     * ```
      *
      * @param array $data The data to reduce.
      * @param string $path The path to extract from $data.
@@ -1123,7 +1131,7 @@ class Hash
         }
 
         if (!$return) {
-            throw new \InvalidArgumentException('Invalid data array to nest.');
+            throw new InvalidArgumentException('Invalid data array to nest.');
         }
 
         if ($options['root']) {

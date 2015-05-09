@@ -263,6 +263,35 @@ class FormHelperTest extends TestCase
     }
 
     /**
+     * Test that secureFields() of widget is called after calling render(),
+     * not before.
+     *
+     * @return void
+     */
+    public function testOrderForRenderingWidgetAndFetchingSecureFields()
+    {
+        $data = [
+            'val' => 1,
+            'name' => 'test'
+        ];
+        $mock = $this->getMock('Cake\View\Widget\WidgetInterface');
+        $this->assertNull($this->Form->addWidget('test', $mock));
+
+        $mock->expects($this->at(0))
+            ->method('render')
+            ->with($data)
+            ->will($this->returnValue('HTML'));
+
+        $mock->expects($this->at(1))
+            ->method('secureFields')
+            ->with($data)
+            ->will($this->returnValue(['test']));
+
+        $result = $this->Form->widget('test', $data + ['secure' => true]);
+        $this->assertEquals('HTML', $result);
+    }
+
+    /**
      * Test that empty string is not added to secure fields list when
      * rendering input widget without name.
      *
@@ -641,6 +670,29 @@ class FormHelperTest extends TestCase
             'input' => ['type' => 'hidden', 'name' => '_method', 'value' => 'PUT'],
             '/div'
         ];
+        $this->assertHtml($expected, $result);
+    }
+
+    /**
+     * Test create() with no URL (no "action" attribute for <form> tag)
+     *
+     * @return void
+     */
+    public function testCreateNoUrl()
+    {
+        $result = $this->Form->create(false, ['url' => false]);
+        $expected = [
+            'form' => [
+                'method' => 'post',
+                'accept-charset' => strtolower(Configure::read('App.encoding'))
+            ],
+            'div' => ['style' => 'display:none;'],
+            'input' => ['type' => 'hidden', 'name' => '_method', 'value' => 'POST'],
+            '/div'
+        ];
+        $this->assertHtml($expected, $result);
+
+        $result = $this->Form->create(false, ['action' => false]);
         $this->assertHtml($expected, $result);
     }
 
@@ -3092,6 +3144,24 @@ class FormHelperTest extends TestCase
     }
 
     /**
+     * testFormInputSubmit method
+     *
+     * test correct results for form::input() and type submit.
+     *
+     * @return void
+     */
+    public function testFormInputSubmit()
+    {
+        $result = $this->Form->input('Test Submit', ['type' => 'submit', 'class' => 'foobar']);
+        $expected = [
+            'div' => ['class' => 'submit'],
+            'input' => ['type' => 'submit', 'class' => 'foobar', 'id' => 'test-submit', 'value' => 'Test Submit'],
+            '/div'
+        ];
+        $this->assertHtml($expected, $result);
+    }
+
+    /**
      * testFormInputs method
      *
      * test correct results from form::inputs().
@@ -3673,6 +3743,28 @@ class FormHelperTest extends TestCase
             ['label' => ['for' => 'model-custom-1']],
             ['input' => ['type' => 'radio', 'name' => 'Model[custom]', 'value' => '1', 'id' => 'model-custom-1']],
             'option B',
+            '/label',
+        ];
+        $this->assertHtml($expected, $result);
+
+        $result = $this->Form->radio(
+            'Employee.gender',
+            [
+                ['value' => 'male', 'text' => 'Male', 'style' => 'width:20px'],
+                ['value' => 'female', 'text' => 'Female', 'style' => 'width:20px'],
+            ]
+        );
+        $expected = [
+            'input' => ['type' => 'hidden', 'name' => 'Employee[gender]', 'value' => ''],
+            ['label' => ['for' => 'employee-gender-male']],
+            ['input' => ['type' => 'radio', 'name' => 'Employee[gender]', 'value' => 'male',
+                'id' => 'employee-gender-male', 'style' => 'width:20px']],
+            'Male',
+            '/label',
+            ['label' => ['for' => 'employee-gender-female']],
+            ['input' => ['type' => 'radio', 'name' => 'Employee[gender]', 'value' => 'female',
+                'id' => 'employee-gender-female', 'style' => 'width:20px']],
+            'Female',
             '/label',
         ];
         $this->assertHtml($expected, $result);

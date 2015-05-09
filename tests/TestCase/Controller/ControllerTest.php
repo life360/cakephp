@@ -70,7 +70,7 @@ class TestController extends ControllerTestAppController
      *
      * @var array
      */
-    public $helpers = ['Session'];
+    public $helpers = ['Html'];
 
     /**
      * components property
@@ -549,7 +549,6 @@ class ControllerTest extends TestCase
 
         $expected = [
             'Html' => null,
-            'Session' => null
         ];
         $this->assertEquals($expected, $TestController->helpers);
 
@@ -763,7 +762,7 @@ class ControllerTest extends TestCase
     public function testInvokeActionMissingAction()
     {
         $url = new Request('test/missing');
-        $url->addParams(['controller' => 'test_controller', 'action' => 'missing']);
+        $url->addParams(['controller' => 'Test', 'action' => 'missing']);
         $response = $this->getMock('Cake\Network\Response');
 
         $Controller = new TestController($url, $response);
@@ -780,7 +779,7 @@ class ControllerTest extends TestCase
     public function testInvokeActionPrivate()
     {
         $url = new Request('test/private_m/');
-        $url->addParams(['controller' => 'test_controller', 'action' => 'private_m']);
+        $url->addParams(['controller' => 'Test', 'action' => 'private_m']);
         $response = $this->getMock('Cake\Network\Response');
 
         $Controller = new TestController($url, $response);
@@ -797,7 +796,7 @@ class ControllerTest extends TestCase
     public function testInvokeActionProtected()
     {
         $url = new Request('test/protected_m/');
-        $url->addParams(['controller' => 'test_controller', 'action' => 'protected_m']);
+        $url->addParams(['controller' => 'Test', 'action' => 'protected_m']);
         $response = $this->getMock('Cake\Network\Response');
 
         $Controller = new TestController($url, $response);
@@ -814,7 +813,7 @@ class ControllerTest extends TestCase
     public function testInvokeActionBaseMethods()
     {
         $url = new Request('test/redirect/');
-        $url->addParams(['controller' => 'test_controller', 'action' => 'redirect']);
+        $url->addParams(['controller' => 'Test', 'action' => 'redirect']);
         $response = $this->getMock('Cake\Network\Response');
 
         $Controller = new TestController($url, $response);
@@ -830,7 +829,7 @@ class ControllerTest extends TestCase
     {
         $url = new Request('test/returner/');
         $url->addParams([
-            'controller' => 'test_controller',
+            'controller' => 'Test',
             'action' => 'returner',
             'pass' => []
         ]);

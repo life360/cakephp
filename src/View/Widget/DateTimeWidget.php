@@ -18,6 +18,7 @@ use Cake\View\Form\ContextInterface;
 use Cake\View\StringTemplate;
 use Cake\View\Widget\SelectBoxWidget;
 use Cake\View\Widget\WidgetInterface;
+use RuntimeException;
 
 /**
  * Input widget class for generating a date time input widget.
@@ -122,29 +123,9 @@ class DateTimeWidget implements WidgetInterface
      */
     public function render(array $data, ContextInterface $context)
     {
-        $data += [
-            'name' => '',
-            'empty' => false,
-            'disabled' => null,
-            'val' => null,
-            'year' => [],
-            'month' => [],
-            'day' => [],
-            'hour' => [],
-            'minute' => [],
-            'second' => [],
-            'meridian' => null,
-        ];
+        $data = $this->_normalizeData($data);
 
         $selected = $this->_deconstructDate($data['val'], $data);
-
-        $timeFormat = isset($data['hour']['format']) ? $data['hour']['format'] : null;
-        if ($timeFormat === 12 && !isset($data['meridian'])) {
-            $data['meridian'] = [];
-        }
-        if ($timeFormat === 24) {
-            $data['meridian'] = false;
-        }
 
         $templateOptions = [];
         foreach ($this->_selects as $select) {
@@ -154,7 +135,7 @@ class DateTimeWidget implements WidgetInterface
                 continue;
             }
             if (!is_array($data[$select])) {
-                throw new \RuntimeException(sprintf(
+                throw new RuntimeException(sprintf(
                     'Options for "%s" must be an array|false|null',
                     $select
                 ));
@@ -175,6 +156,39 @@ class DateTimeWidget implements WidgetInterface
         unset($data['name'], $data['empty'], $data['disabled'], $data['val']);
         $templateOptions['attrs'] = $this->_templates->formatAttributes($data);
         return $this->_templates->format('dateWidget', $templateOptions);
+    }
+
+    /**
+     * Normalize data.
+     *
+     * @param array $data Data to normalize.
+     * @return array Normalized data.
+     */
+    protected function _normalizeData($data)
+    {
+        $data += [
+            'name' => '',
+            'empty' => false,
+            'disabled' => null,
+            'val' => null,
+            'year' => [],
+            'month' => [],
+            'day' => [],
+            'hour' => [],
+            'minute' => [],
+            'second' => [],
+            'meridian' => null,
+        ];
+
+        $timeFormat = isset($data['hour']['format']) ? $data['hour']['format'] : null;
+        if ($timeFormat === 12 && !isset($data['meridian'])) {
+            $data['meridian'] = [];
+        }
+        if ($timeFormat === 24) {
+            $data['meridian'] = false;
+        }
+
+        return $data;
     }
 
     /**
@@ -226,6 +240,7 @@ class DateTimeWidget implements WidgetInterface
                     }
                     if (!empty($dateArray['minute']) && isset($options['minute']['interval'])) {
                         $dateArray['minute'] += $this->_adjustValue($dateArray['minute'], $options['minute']);
+                        $dateArray['minute'] = str_pad(strval($dateArray['minute']), 2, '0', STR_PAD_LEFT);
                     }
 
                     return $dateArray;
@@ -460,7 +475,7 @@ class DateTimeWidget implements WidgetInterface
             'val' => null,
             'leadingZeroKey' => true,
             'leadingZeroValue' => true,
-            'options' => $this->_generateNumbers(1, 60)
+            'options' => $this->_generateNumbers(0, 59)
         ];
 
         unset($options['leadingZeroKey'], $options['leadingZeroValue']);
@@ -568,15 +583,15 @@ class DateTimeWidget implements WidgetInterface
      */
     public function secureFields(array $data)
     {
+        $data = $this->_normalizeData($data);
+
         $fields = [];
-        $hourFormat = isset($data['hour']['format']) ? $data['hour']['format'] : null;
-        foreach ($this->_selects as $type) {
-            if ($type === 'meridian' && ($hourFormat === null || $hourFormat === 24)) {
+        foreach ($this->_selects as $select) {
+            if ($data[$select] === false || $data[$select] === null) {
                 continue;
             }
-            if (!isset($data[$type]) || $data[$type] !== false) {
-                $fields[] = $data['name'] . '[' . $type . ']';
-            }
+
+            $fields[] = $data['name'] . '[' . $select . ']';
         }
         return $fields;
     }

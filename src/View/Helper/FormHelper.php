@@ -34,6 +34,7 @@ use Cake\View\StringTemplateTrait;
 use Cake\View\View;
 use Cake\View\Widget\WidgetRegistry;
 use DateTime;
+use RuntimeException;
 use Traversable;
 
 /**
@@ -366,11 +367,16 @@ class FormHelper extends Helper
         }
         unset($options['templates']);
 
-        $url = $this->_formUrl($context, $options);
-        $action = $this->Url->build($url);
-        unset($options['url'], $options['action'], $options['idPrefix']);
+        if ($options['action'] === false || $options['url'] === false) {
+            $url = $this->request->here(false);
+            $action = null;
+        } else {
+            $url = $this->_formUrl($context, $options);
+            $action = $this->Url->build($url);
+        }
 
         $this->_lastAction($url);
+        unset($options['url'], $options['action'], $options['idPrefix']);
 
         $htmlAttributes = [];
         switch (strtolower($options['type'])) {
@@ -544,7 +550,7 @@ class FormHelper extends Helper
      */
     public function secure(array $fields = [], array $secureAttributes = [])
     {
-        if (!isset($this->request['_Token']) || empty($this->request['_Token'])) {
+        if (empty($this->request['_Token'])) {
             return;
         }
         $locked = [];
@@ -1011,6 +1017,7 @@ class FormHelper extends Helper
 
         $label = $options['label'];
         unset($options['label']);
+
         $nestedInput = false;
         if ($options['type'] === 'checkbox') {
             $nestedInput = true;
@@ -1022,7 +1029,7 @@ class FormHelper extends Helper
         }
 
         $input = $this->_getInput($fieldName, $options);
-        if ($options['type'] === 'hidden') {
+        if ($options['type'] === 'hidden' || $options['type'] === 'submit') {
             if ($newTemplates) {
                 $templater->pop();
             }
@@ -1423,7 +1430,7 @@ class FormHelper extends Helper
      *
      * @param string $fieldName Name of a field, like this "modelname.fieldname"
      * @param array|\Traversable $options Radio button options array.
-     * @param array $attributes Array of HTML attributes, and special attributes above.
+     * @param array $attributes Array of attributes.
      * @return string Completed radio widget set.
      * @link http://book.cakephp.org/3.0/en/views/helpers/form.html#creating-radio-buttons
      */
@@ -1458,7 +1465,9 @@ class FormHelper extends Helper
      *
      * ### Usage
      *
-     * `$this->Form->search('User.query', ['value' => 'test']);`
+     * ```
+     * $this->Form->search('User.query', ['value' => 'test']);
+     * ```
      *
      * Will make an input like:
      *
@@ -2480,7 +2489,7 @@ class FormHelper extends Helper
             $context = new NullContext($this->request, $data);
         }
         if (!($context instanceof ContextInterface)) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 'Context objects must implement Cake\View\Form\ContextInterface'
             );
         }
@@ -2516,17 +2525,19 @@ class FormHelper extends Helper
      */
     public function widget($name, array $data = [])
     {
+        $secure = null;
+        if (isset($data['secure'])) {
+            $secure = $data['secure'];
+            unset($data['secure']);
+        }
         $widget = $this->_registry->get($name);
-        if (isset($data['secure'], $data['name']) &&
-            $data['secure'] !== self::SECURE_SKIP
-        ) {
+        $out = $widget->render($data, $this->context());
+        if (isset($data['name']) && $secure !== null && $secure !== self::SECURE_SKIP) {
             foreach ($widget->secureFields($data) as $field) {
-                $this->_secure($data['secure'], $this->_secureFieldName($field));
+                $this->_secure($secure, $this->_secureFieldName($field));
             }
         }
-        unset($data['secure']);
-
-        return $widget->render($data, $this->context());
+        return $out;
     }
 
     /**

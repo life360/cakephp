@@ -20,6 +20,8 @@ use Cake\Event\Event;
 use Cake\ORM\Behavior;
 use Cake\ORM\Entity;
 use Cake\ORM\Query;
+use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * Makes the table to which this is attached to behave like a nested set and
@@ -92,7 +94,7 @@ class TreeBehavior extends Behavior
 
         if ($isNew && $parent) {
             if ($entity->get($primaryKey[0]) == $parent) {
-                throw new \RuntimeException("Cannot set a node's parent as itself");
+                throw new RuntimeException("Cannot set a node's parent as itself");
             }
 
             $parentNode = $this->_getNode($parent);
@@ -237,7 +239,7 @@ class TreeBehavior extends Behavior
         $left = $entity->get($config['left']);
 
         if ($parentLeft > $left && $parentLeft < $right) {
-            throw new \RuntimeException(sprintf(
+            throw new RuntimeException(sprintf(
                 'Cannot use node "%s" as parent for entity "%s"',
                 $parent,
                 $entity->get($this->_getPrimaryKey())
@@ -342,7 +344,7 @@ class TreeBehavior extends Behavior
     public function findPath(Query $query, array $options)
     {
         if (empty($options['for'])) {
-            throw new \InvalidArgumentException("The 'for' key is required for find('path')");
+            throw new InvalidArgumentException("The 'for' key is required for find('path')");
         }
 
         $config = $this->config();
@@ -415,7 +417,7 @@ class TreeBehavior extends Behavior
         list($for, $direct) = [$options['for'], $options['direct']];
 
         if (empty($for)) {
-            throw new \InvalidArgumentException("The 'for' key is required for find('children')");
+            throw new InvalidArgumentException("The 'for' key is required for find('children')");
         }
 
         if ($query->clause('order') === null) {

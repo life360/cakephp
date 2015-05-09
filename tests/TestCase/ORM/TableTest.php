@@ -17,7 +17,7 @@ namespace Cake\Test\TestCase\ORM;
 use ArrayObject;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
-use Cake\Database\Expression\OrderByExpression;
+use Cake\Database\Exception;
 use Cake\Database\Expression\QueryExpression;
 use Cake\Database\TypeMap;
 use Cake\Datasource\ConnectionManager;
@@ -56,6 +56,9 @@ class TableTest extends TestCase
         'core.tags',
         'core.articles_tags',
         'core.site_articles',
+        'core.members',
+        'core.groups',
+        'core.groups_members',
     ];
 
     /**
@@ -859,7 +862,7 @@ class TableTest extends TestCase
 
         $query->expects($this->once())
             ->method('execute')
-            ->will($this->throwException(new \Cake\Database\Exception('Not good')));
+            ->will($this->throwException(new Exception('Not good')));
 
         $table->updateAll(['username' => 'mark'], []);
     }
@@ -922,7 +925,7 @@ class TableTest extends TestCase
 
         $query->expects($this->once())
             ->method('execute')
-            ->will($this->throwException(new \Cake\Database\Exception('Not good')));
+            ->will($this->throwException(new Exception('Not good')));
 
         $table->deleteAll(['id >' => 4]);
     }
@@ -1173,6 +1176,114 @@ class TableTest extends TestCase
                 2 => 'nate',
                 4 => 'garrett'
             ]
+        ];
+        $this->assertSame($expected, $query->toArray());
+    }
+
+    /**
+     * Test that find('list') only selects required fields.
+     *
+     * @return void
+     */
+    public function testFindListSelectedFields()
+    {
+        $table = new Table([
+            'table' => 'users',
+            'connection' => $this->connection,
+        ]);
+        $table->displayField('username');
+
+        $query = $table->find('list');
+        $expected = ['id', 'username'];
+        $this->assertSame($expected, $query->clause('select'));
+
+        $query = $table->find('list', ['valueField' => function ($row) {
+            return $row->username;
+        }]);
+        $this->assertEmpty($query->clause('select'));
+
+        $expected = ['odd' => new QueryExpression('id % 2'), 'id', 'username'];
+        $query = $table->find('list', [
+            'fields' => $expected,
+            'groupField' => 'odd',
+        ]);
+        $this->assertSame($expected, $query->clause('select'));
+
+        $articles = new Table([
+            'table' => 'articles',
+            'connection' => $this->connection,
+        ]);
+
+        $query = $articles->find('list', ['groupField' => 'author_id']);
+        $expected = ['id', 'title', 'author_id'];
+        $this->assertSame($expected, $query->clause('select'));
+
+        $query = $articles->find('list', ['valueField' => ['author_id', 'title']])
+            ->order('id');
+        $expected = ['id', 'author_id', 'title'];
+        $this->assertSame($expected, $query->clause('select'));
+
+        $expected = [
+            1 => '1;First Article',
+            2 => '3;Second Article',
+            3 => '1;Third Article',
+        ];
+        $this->assertSame($expected, $query->toArray());
+    }
+
+    /**
+     * test that find('list') does not auto add fields to select if using virtual properties
+     *
+     * @return void
+     */
+    public function testFindListWithVirtualField()
+    {
+        $table = new Table([
+            'table' => 'users',
+            'connection' => $this->connection,
+            'entityClass' => '\TestApp\Model\Entity\VirtualUser'
+        ]);
+        $table->displayField('bonus');
+
+        $query = $table
+            ->find('list')
+            ->order('id');
+        $this->assertEmpty($query->clause('select'));
+
+        $expected = [
+            1 => 'bonus',
+            2 => 'bonus',
+            3 => 'bonus',
+            4 => 'bonus'
+        ];
+        $this->assertSame($expected, $query->toArray());
+
+        $query = $table->find('list', ['groupField' => 'odd']);
+        $this->assertEmpty($query->clause('select'));
+    }
+
+    /**
+     * Test find('list') with value field from associated table
+     *
+     * @return void
+     */
+    public function testFindListWithAssociatedTable()
+    {
+        $articles = new Table([
+            'table' => 'articles',
+            'connection' => $this->connection,
+        ]);
+
+        $articles->belongsTo('Authors');
+        $query = $articles->find('list', ['valueField' => 'author.name'])
+            ->contain(['Authors'])
+            ->order('articles.id');
+        $this->assertEmpty($query->clause('select'));
+
+        $expected = [
+            1 => 'mariano',
+            2 => 'larry',
+            3 => 'mariano',
         ];
         $this->assertSame($expected, $query->toArray());
     }
@@ -2466,6 +2577,63 @@ class TableTest extends TestCase
     }
 
     /**
+     * Test delete with dependent records belonging to an aliased
+     * belongsToMany association.
+     *
+     * @return void
+     */
+    public function testDeleteDependentAliased()
+    {
+        $Authors = TableRegistry::get('authors');
+        $Authors->associations()->removeAll();
+        $Articles = TableRegistry::get('articles');
+        $Articles->associations()->removeAll();
+
+        $Authors->hasMany('AliasedArticles', [
+            'className' => 'articles',
+            'dependent' => true,
+            'cascadeCallbacks' => true
+        ]);
+        $Articles->belongsToMany('Tags');
+
+        $author = $Authors->get(1);
+        $result = $Authors->delete($author);
+
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Test that cascading associations are deleted first.
+     *
+     * @return void
+     */
+    public function testDeleteAssociationsCascadingCallbacksOrder()
+    {
+        $groups = TableRegistry::get('Groups');
+        $members = TableRegistry::get('Members');
+        $groupsMembers = TableRegistry::get('GroupsMembers');
+
+        $groups->belongsToMany('Members');
+        $groups->hasMany('GroupsMembers', [
+            'dependent' => true,
+            'cascadeCallbacks' => true,
+        ]);
+        $groupsMembers->belongsTo('Members');
+        $groupsMembers->addBehavior('CounterCache', [
+            'Members' => ['group_count']
+        ]);
+
+        $member = $members->get(1);
+        $this->assertEquals(2, $member->group_count);
+
+        $group = $groups->get(1);
+        $groups->delete($group);
+
+        $member = $members->get(1);
+        $this->assertEquals(1, $member->group_count);
+    }
+
+    /**
      * Test delete callbacks
      *
      * @return void
@@ -2754,7 +2922,7 @@ class TableTest extends TestCase
         $result = $table->findByUsername('garrett');
         $this->assertInstanceOf('Cake\ORM\Query', $result);
 
-        $expected = new QueryExpression(['username' => 'garrett'], $this->usersTypeMap);
+        $expected = new QueryExpression(['Users.username' => 'garrett'], $this->usersTypeMap);
         $this->assertEquals($expected, $result->clause('where'));
     }
 
@@ -2812,7 +2980,7 @@ class TableTest extends TestCase
         $result = $table->findByUsernameAndId('garrett', 4);
         $this->assertInstanceOf('Cake\ORM\Query', $result);
 
-        $expected = new QueryExpression(['username' => 'garrett', 'id' => 4], $this->usersTypeMap);
+        $expected = new QueryExpression(['Users.username' => 'garrett', 'Users.id' => 4], $this->usersTypeMap);
         $this->assertEquals($expected, $result->clause('where'));
     }
 
@@ -2832,8 +3000,8 @@ class TableTest extends TestCase
         $expected->add(
             [
             'OR' => [
-                'username' => 'garrett',
-                'id' => 4
+                'Users.username' => 'garrett',
+                'Users.id' => 4
             ]]
         );
         $this->assertEquals($expected, $result->clause('where'));
@@ -2852,7 +3020,7 @@ class TableTest extends TestCase
         $this->assertInstanceOf('Cake\ORM\Query', $result);
         $this->assertNull($result->clause('limit'));
 
-        $expected = new QueryExpression(['author_id' => 1], $this->articlesTypeMap);
+        $expected = new QueryExpression(['Articles.author_id' => 1], $this->articlesTypeMap);
         $this->assertEquals($expected, $result->clause('where'));
     }
 
@@ -2869,7 +3037,7 @@ class TableTest extends TestCase
         $this->assertInstanceOf('Cake\ORM\Query', $result);
         $this->assertNull($result->clause('limit'));
         $expected = new QueryExpression(
-            ['author_id' => 1, 'published' => 'Y'],
+            ['Users.author_id' => 1, 'Users.published' => 'Y'],
             $this->usersTypeMap
         );
         $this->assertEquals($expected, $result->clause('where'));
@@ -2901,7 +3069,7 @@ class TableTest extends TestCase
             'updated' => 'timestamp',
         ]);
         $expected->add(
-            ['or' => ['author_id' => 1, 'published' => 'Y']]
+            ['or' => ['Users.author_id' => 1, 'Users.published' => 'Y']]
         );
         $this->assertEquals($expected, $result->clause('where'));
         $this->assertNull($result->clause('order'));
@@ -3168,6 +3336,22 @@ class TableTest extends TestCase
         $entity = $table->get(1, ['contain' => 'Tags']);
         $this->assertCount(1, $entity->tags, 'Only one tag in the db.');
         $this->assertEquals($tag->id, $entity->tags[0]->id);
+    }
+
+    /**
+     * Test that belongsToMany ignores non-entity data.
+     *
+     * @return void
+     */
+    public function testSaveBelongsToManyIgnoreNonEntityData()
+    {
+        $articles = TableRegistry::get('Articles');
+        $article = $articles->get(1, ['contain' => ['Tags']]);
+        $article->tags = [
+            '_ids' => [2, 1]
+        ];
+        $result = $articles->save($article);
+        $this->assertSame($result, $article);
     }
 
     /**
@@ -4056,6 +4240,24 @@ class TableTest extends TestCase
             $cloned->extract(['title', 'author_id'])
         );
         $this->assertEquals(4, $cloned->id);
+    }
+
+    public function testSaveHasManyWithIds()
+    {
+        $data = [
+            'username' => 'lux',
+            'password' => 'passphrase',
+            'comments' => [
+                '_ids' => [1, 2]
+            ]
+        ];
+
+        $userTable = TableRegistry::get('Users');
+        $userTable->hasMany('Comments');
+        $savedUser = $userTable->save($userTable->newEntity($data, ['associated' => ['Comments']]));
+        $retrievedUser = $userTable->find('all')->where(['id' => $savedUser->id])->contain(['Comments'])->first();
+        $this->assertEquals($savedUser->comments[0]->user_id, $retrievedUser->comments[0]->user_id);
+        $this->assertEquals($savedUser->comments[1]->user_id, $retrievedUser->comments[1]->user_id);
     }
 
     /**

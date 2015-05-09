@@ -33,19 +33,31 @@ class Xml
      *
      * Building XML from a string:
      *
-     * `$xml = Xml::build('<example>text</example>');`
+     * ```
+     * $xml = Xml::build('<example>text</example>');
+     * ```
      *
      * Building XML from string (output DOMDocument):
      *
-     * `$xml = Xml::build('<example>text</example>', ['return' => 'domdocument']);`
+     * ```
+     * $xml = Xml::build('<example>text</example>', ['return' => 'domdocument']);
+     * ```
      *
      * Building XML from a file path:
      *
-     * `$xml = Xml::build('/path/to/an/xml/file.xml');`
+     * ```
+     * $xml = Xml::build('/path/to/an/xml/file.xml');
+     * ```
      *
-     * Building from a remote URL:
+     * Building XML from a remote URL:
      *
-     * `$xml = Xml::build('http://example.com/example.xml');`
+     * ```
+     * use Cake\Network\Http\Client;
+     *
+     * $http = new Client();
+     * $response = $http->get('http://example.com/example.xml');
+     * $xml = Xml::build($response->body());
+     * ```
      *
      * Building from an array:
      *
@@ -148,7 +160,7 @@ class Xml
      *
      * ### Options
      *
-     * - `format` If create childs ('tags') or attributes ('attribute').
+     * - `format` If create childs ('tags') or attributes ('attributes').
      * - `pretty` Returns formatted Xml when set to `true`. Defaults to `false`
      * - `version` Version of XML document. Default is 1.0.
      * - `encoding` Encoding of XML document. If null remove from XML header. Default is the some of application.
@@ -172,7 +184,7 @@ class Xml
      *
      * `<root><tag><id>1</id><value>defect</value>description</tag></root>`
      *
-     * And calling `Xml::fromArray($value, 'attribute');` Will generate:
+     * And calling `Xml::fromArray($value, 'attributes');` Will generate:
      *
      * `<root><tag id="1" value="defect">description</tag></root>`
      *
@@ -225,7 +237,7 @@ class Xml
      * @param \DOMDocument $dom Handler to DOMDocument
      * @param \DOMElement $node Handler to DOMElement (child)
      * @param array $data Array of data to append to the $node.
-     * @param string $format Either 'attribute' or 'tags'. This determines where nested keys go.
+     * @param string $format Either 'attributes' or 'tags'. This determines where nested keys go.
      * @return void
      * @throws \Cake\Utility\Exception\XmlException
      */

@@ -124,6 +124,7 @@ class MarshallerTest extends TestCase
 
         $this->articles = $articles;
         $this->comments = $comments;
+        $this->users = $users;
     }
 
     /**
@@ -135,7 +136,7 @@ class MarshallerTest extends TestCase
     {
         parent::tearDown();
         TableRegistry::clear();
-        unset($this->articles, $this->comments);
+        unset($this->articles, $this->comments, $this->users);
     }
 
     /**
@@ -304,6 +305,37 @@ class MarshallerTest extends TestCase
         $result = $marshall->one($data, ['accessibleFields' => ['*' => true]]);
         $this->assertEquals($data['author_id'], $result->author_id);
         $this->assertTrue($result->not_in_schema);
+    }
+
+    /**
+     * Test one() supports accessibleFields option for associations
+     *
+     * @return void
+     */
+    public function testOneAccessibleFieldsOptionForAssociations()
+    {
+        $data = [
+            'title' => 'My title',
+            'body' => 'My content',
+            'user' => [
+                'id' => 1,
+                'username' => 'mark',
+            ]
+        ];
+        $this->articles->entityClass(__NAMESPACE__ . '\ProtectedArticle');
+        $this->users->entityClass(__NAMESPACE__ . '\ProtectedArticle');
+
+        $marshall = new Marshaller($this->articles);
+
+        $result = $marshall->one($data, [
+            'associated' => [
+                'Users' => ['accessibleFields' => ['id' => true]]
+            ],
+            'accessibleFields' => ['body' => false, 'user' => true]
+        ]);
+        $this->assertNull($result->body);
+        $this->assertNull($result->user->username);
+        $this->assertEquals(1, $result->user->id);
     }
 
     /**
@@ -558,6 +590,159 @@ class MarshallerTest extends TestCase
     }
 
     /**
+     * Test belongsToMany association with mixed data and _joinData
+     *
+     * @return void
+     */
+    public function testBelongsToManyWithMixedJoinData()
+    {
+        $data = [
+            'title' => 'My title',
+            'body' => 'My content',
+            'author_id' => 1,
+            'tags' => [
+                [
+                    'id' => 1,
+                    '_joinData' => [
+                        'active' => 0,
+                    ]
+                ],
+                [
+                    'name' => 'tag5',
+                    '_joinData' => [
+                        'active' => 1,
+                    ]
+                ]
+            ]
+        ];
+        $marshall = new Marshaller($this->articles);
+
+        $result = $marshall->one($data, ['associated' => ['Tags._joinData']]);
+
+        $this->assertEquals($data['tags'][0]['id'], $result->tags[0]->id);
+        $this->assertEquals($data['tags'][1]['name'], $result->tags[1]->name);
+        $this->assertEquals(0, $result->tags[0]->_joinData->active);
+        $this->assertEquals(1, $result->tags[1]->_joinData->active);
+    }
+
+    /**
+     * Test belongsToMany association with mixed data and _joinData
+     *
+     * @return void
+     */
+    public function testBelongsToManyWithMixedJoinDataOutOfOrder()
+    {
+        $data = [
+            'title' => 'My title',
+            'body' => 'My content',
+            'author_id' => 1,
+            'tags' => [
+                [
+                    'name' => 'tag5',
+                    '_joinData' => [
+                        'active' => 1,
+                    ]
+                ],
+                [
+                    'id' => 1,
+                    '_joinData' => [
+                        'active' => 0,
+                    ]
+                ],
+                [
+                    'name' => 'tag3',
+                    '_joinData' => [
+                        'active' => 1,
+                    ]
+                ],
+            ]
+        ];
+        $marshall = new Marshaller($this->articles);
+        $result = $marshall->one($data, ['associated' => ['Tags._joinData']]);
+
+        $this->assertEquals($data['tags'][0]['name'], $result->tags[0]->name);
+        $this->assertEquals($data['tags'][1]['id'], $result->tags[1]->id);
+        $this->assertEquals($data['tags'][2]['name'], $result->tags[2]->name);
+
+        $this->assertEquals(1, $result->tags[0]->_joinData->active);
+        $this->assertEquals(0, $result->tags[1]->_joinData->active);
+        $this->assertEquals(1, $result->tags[2]->_joinData->active);
+    }
+
+    /**
+     * Test belongsToMany association with mixed data array
+     *
+     * @return void
+     */
+    public function testBelongsToManyWithMixedData()
+    {
+        $data = [
+            'title' => 'My title',
+            'body' => 'My content',
+            'author_id' => 1,
+            'tags' => [
+                [
+                    'name' => 'tag4'
+                ],
+                [
+                    'name' => 'tag5'
+                ],
+                [
+                    'id' => 1
+                ]
+            ]
+        ];
+
+        $articles = TableRegistry::get('Articles');
+        $articles->belongsToMany('Tags');
+
+        $tags = TableRegistry::get('Tags');
+
+        $article = $articles->newEntity($data, [
+            'associated' => [
+                'Tags'
+            ]
+        ]);
+
+        $this->assertEquals($data['tags'][0]['name'], $article->tags[0]->name);
+        $this->assertEquals($data['tags'][1]['name'], $article->tags[1]->name);
+        $this->assertEquals($article->tags[2], $tags->get(1));
+
+        $this->assertEquals($article->tags[0]->isNew(), true);
+        $this->assertEquals($article->tags[1]->isNew(), true);
+        $this->assertEquals($article->tags[2]->isNew(), false);
+
+        $tagCount = $tags->find()->count();
+        $articles->save($article);
+
+        $this->assertEquals($tagCount + 2, $tags->find()->count());
+    }
+
+    /**
+     * Test HasMany association with _ids attribute
+     *
+     * @return void
+     */
+    public function testHasManyWithIds()
+    {
+        $data = [
+            'username' => 'lux',
+            'password' => 'passphrase',
+            'comments' => [
+                '_ids' => [1, 2]
+            ]
+        ];
+
+        $userTable = TableRegistry::get('Users');
+        $userTable->hasMany('Comments');
+        $commentTable = TableRegistry::get('Comments');
+        $user = $userTable->newEntity($data, ['associated' => ['Comments']]);
+
+        $this->assertEquals($user->comments[0], $commentTable->get(1));
+        $this->assertEquals($user->comments[1], $commentTable->get(2));
+    }
+
+    /**
      * Test one() with deeper associations.
      *
      * @return void
@@ -608,6 +793,24 @@ class MarshallerTest extends TestCase
         $this->assertInstanceOf('Cake\ORM\Entity', $result[1]);
         $this->assertEquals($data[0]['comment'], $result[0]->comment);
         $this->assertEquals($data[1]['comment'], $result[1]->comment);
+    }
+
+    /**
+     * Test many() with some invalid data
+     *
+     * @return void
+     */
+    public function testManyInvalidData()
+    {
+        $data = [
+            ['id' => 2, 'comment' => 'Changed 2', 'user_id' => 2],
+            ['id' => 1, 'comment' => 'Changed 1', 'user_id' => 1],
+            '_csrfToken' => 'abc123',
+        ];
+        $marshall = new Marshaller($this->comments);
+        $result = $marshall->many($data);
+
+        $this->assertCount(2, $result);
     }
 
     /**
@@ -781,6 +984,40 @@ class MarshallerTest extends TestCase
             'author_id' => 1
         ];
         $this->assertEquals($expected, $result->toArray());
+    }
+
+    /**
+     * Test merge when fieldList contains an association.
+     *
+     * @return void
+     */
+    public function testMergeWithSingleAssociationAndFieldLists()
+    {
+        $user = new Entity([
+           'username' => 'user',
+        ]);
+        $article = new Entity([
+           'title' => 'title for post',
+           'body' => 'body',
+           'user' => $user,
+        ]);
+
+        $user->accessible('*', true);
+        $article->accessible('*', true);
+
+        $data = [
+            'title' => 'Chelsea',
+            'user' => [
+                'username' => 'dee'
+            ]
+        ];
+
+        $marshall = new Marshaller($this->articles);
+        $marshall->merge($article, $data, [
+            'fieldList' => ['title', 'user'],
+            'associated' => ['Users' => []]
+        ]);
+        $this->assertSame($user, $article->user);
     }
 
     /**
@@ -1371,6 +1608,32 @@ class MarshallerTest extends TestCase
         $this->assertEquals('Changed 2', $result[1]->comment);
         $this->assertTrue($result[0]->dirty('user_id'));
         $this->assertFalse($result[1]->dirty('user_id'));
+    }
+
+    /**
+     * Test mergeMany() with some invalid data
+     *
+     * @return void
+     */
+    public function testMergeManyInvalidData()
+    {
+        $entities = [
+            new OpenEntity(['id' => 1, 'comment' => 'First post', 'user_id' => 2]),
+            new OpenEntity(['id' => 2, 'comment' => 'Second post', 'user_id' => 2])
+        ];
+        $entities[0]->clean();
+        $entities[1]->clean();
+
+        $data = [
+            ['id' => 2, 'comment' => 'Changed 2', 'user_id' => 2],
+            ['id' => 1, 'comment' => 'Changed 1', 'user_id' => 1],
+            '_csrfToken' => 'abc123',
+        ];
+        $marshall = new Marshaller($this->comments);
+        $result = $marshall->mergeMany($entities, $data);
+
+        $this->assertSame($entities[0], $result[0]);
+        $this->assertSame($entities[1], $result[1]);
     }
 
     /**

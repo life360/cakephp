@@ -16,6 +16,7 @@ namespace Cake\Datasource;
 
 use Cake\Collection\Collection;
 use Cake\Utility\Inflector;
+use InvalidArgumentException;
 use Traversable;
 
 /**
@@ -99,8 +100,8 @@ trait EntityTrait
      * property name points to a boolean indicating its status. An empty array
      * means no properties are accessible
      *
-     * The special property '*' can also be mapped, meaning that any other property
-     * not defined in the map will take its value. For example, `'*' => true`
+     * The special property '\*' can also be mapped, meaning that any other property
+     * not defined in the map will take its value. For example, `'\*' => true`
      * means that any property not defined in the map will be accessible by default
      *
      * @var array
@@ -113,6 +114,13 @@ trait EntityTrait
      * @var string
      */
     protected $_registryAlias;
+
+    /**
+     * Holds a list of properties that were mutated using the get accessor
+     *
+     * @var array
+     */
+    protected $_mutated = [];
 
     /**
      * Magic getter to access properties that have been set in this entity
@@ -225,7 +233,7 @@ trait EntityTrait
         }
 
         if (!is_array($property)) {
-            throw new \InvalidArgumentException('Cannot set an empty property');
+            throw new InvalidArgumentException('Cannot set an empty property');
         }
         $options += ['setter' => true, 'guard' => $guard];
 
@@ -234,6 +242,7 @@ trait EntityTrait
                 continue;
             }
 
+            unset($this->_mutated[$p]);
             $this->dirty($p, true);
 
             if (!isset($this->_original[$p]) &&
@@ -267,7 +276,11 @@ trait EntityTrait
     public function &get($property)
     {
         if (!strlen((string)$property)) {
-            throw new \InvalidArgumentException('Cannot get an empty property');
+            throw new InvalidArgumentException('Cannot get an empty property');
+        }
+
+        if (array_key_exists($property, $this->_mutated)) {
+            return $this->_mutated[$property];
         }
 
         $value = null;
@@ -279,6 +292,7 @@ trait EntityTrait
 
         if ($this->_methodExists($method)) {
             $result = $this->{$method}($value);
+            $this->_mutated[$property] = $result;
             return $result;
         }
         return $value;
@@ -294,7 +308,7 @@ trait EntityTrait
     public function getOriginal($property)
     {
         if (!strlen((string)$property)) {
-            throw new \InvalidArgumentException('Cannot get an empty property');
+            throw new InvalidArgumentException('Cannot get an empty property');
         }
         if (isset($this->_original[$property])) {
             return $this->_original[$property];
@@ -350,6 +364,7 @@ trait EntityTrait
         foreach ($property as $p) {
             unset($this->_properties[$p]);
             unset($this->_dirty[$p]);
+            unset($this->_mutated[$p]);
         }
 
         return $this;
@@ -525,12 +540,37 @@ trait EntityTrait
 
     /**
      * Returns an array with the requested original properties
-     * stored in this entity, indexed by property name
+     * stored in this entity, indexed by property name.
+     *
+     * Properties that are unchanged from their original value will be included in the
+     * return of this method.
      *
      * @param array $properties List of properties to be returned
      * @return array
      */
     public function extractOriginal(array $properties)
+    {
+        $result = [];
+        foreach ($properties as $property) {
+            $original = $this->getOriginal($property);
+            if ($original !== null) {
+                $result[$property] = $original;
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * Returns an array with only the original properties
+     * stored in this entity, indexed by property name.
+     *
+     * This method will only return properties that have been modified since
+     * the entity was built. Unchanged properties will be omitted.
+     *
+     * @param array $properties List of properties to be returned
+     * @return array
+     */
+    public function extractOriginalChanged(array $properties)
     {
         $result = [];
         foreach ($properties as $property) {
@@ -753,7 +793,7 @@ trait EntityTrait
 
     /**
      * Stores whether or not a property value can be changed or set in this entity.
-     * The special property '*' can also be marked as accessible or protected, meaning
+     * The special property `*` can also be marked as accessible or protected, meaning
      * that any other property specified before will take its value. For example
      * `$entity->accessible('*', true)`  means that any property not specified already
      * will be accessible by default.

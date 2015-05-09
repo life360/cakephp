@@ -174,7 +174,24 @@ class TimeTest extends TestCase
             ],
         ];
     }
-
+    /**
+     * test the timezone option for timeAgoInWords
+     *
+     * @return void
+     */
+    public function testTimeAgoInWordsTimezone()
+    {
+        $time = new Time('1990-07-31 20:33:00 UTC');
+        $result = $time->timeAgoInWords(
+            [
+                'timezone' => 'America/Vancouver',
+                'end' => '+1month',
+                'format' => 'dd-MM-YYYY HH:mm:ss'
+            ]
+        );
+        $this->assertEquals('on 31-07-1990 13:33:00', $result);
+    }
+     
     /**
      * test the end option for timeAgoInWords
      *
@@ -527,6 +544,29 @@ class TimeTest extends TestCase
         $result = $time->i18nFormat(\IntlDateFormatter::FULL, null, 'es-ES');
         $expected = 'jueves, 14 de enero de 2010, 13:59:28 (GMT)';
         $this->assertTimeFormat($expected, $result, 'DEfault locale should not be used');
+    }
+
+    /**
+     * test formatting dates with offset style timezone
+     *
+     * @return void
+     */
+    public function testI18nFormatWithOffsetTimezone()
+    {
+        $time = new Time('2014-01-01T00:00:00+00');
+        $result = $time->i18nFormat(\IntlDateFormatter::FULL);
+        $expected = 'Wednesday January 1 2014 12:00:00 AM GMT';
+        $this->assertTimeFormat($expected, $result);
+
+        $time = new Time('2014-01-01T00:00:00+09');
+        $result = $time->i18nFormat(\IntlDateFormatter::FULL);
+        $expected = 'Wednesday January 1 2014 12:00:00 AM GMT+09:00';
+        $this->assertTimeFormat($expected, $result);
+
+        $time = new Time('2014-01-01T00:00:00-01:30');
+        $result = $time->i18nFormat(\IntlDateFormatter::FULL);
+        $expected = 'Wednesday January 1 2014 12:00:00 AM GMT-01:30';
+        $this->assertTimeFormat($expected, $result);
     }
 
     /**

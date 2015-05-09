@@ -23,9 +23,6 @@ namespace TestApp\Controller;
 
 class TestsAppsController extends AppController
 {
-
-    public $uses = [];
-
     public $components = ['RequestHandler'];
 
     public function index()
@@ -57,5 +54,16 @@ class TestsAppsController extends AppController
     public function redirect_to_permanent()
     {
         return $this->redirect('http://cakephp.org', 301);
+    }
+
+    public function set_type()
+    {
+        $this->response->type('json');
+        return $this->response;
+    }
+
+    public function throw_exception()
+    {
+        throw new \RuntimeException('Foo');
     }
 }

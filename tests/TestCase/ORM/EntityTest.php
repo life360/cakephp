@@ -72,6 +72,34 @@ class EntityTest extends TestCase
     }
 
     /**
+     * Test extractOriginal()
+     *
+     * @return void
+     */
+    public function testExtractOriginal()
+    {
+        $entity = new Entity([
+            'id' => 1,
+            'title' => 'original',
+            'body' => 'no'
+        ], ['markNew' => true]);
+        $entity->set('body', 'updated body');
+        $result = $entity->extractOriginal(['id', 'title', 'body']);
+        $expected = [
+            'id' => 1,
+            'title' => 'original',
+            'body' => 'no'
+        ];
+        $this->assertEquals($expected, $result);
+
+        $result = $entity->extractOriginalChanged(['id', 'title', 'body']);
+        $expected = [
+            'body' => 'no',
+        ];
+        $this->assertEquals($expected, $result);
+    }
+
+    /**
      * Tests setting a single property using a setter function
      *
      * @return void
@@ -199,16 +227,56 @@ class EntityTest extends TestCase
     public function testGetCustomGetters()
     {
         $entity = $this->getMock('\Cake\ORM\Entity', ['_getName']);
-        $entity->expects($this->exactly(2))->method('_getName')
+        $entity->expects($this->once())->method('_getName')
             ->with('Jones')
             ->will($this->returnCallback(function ($name) {
-                $this->assertSame('Jones', $name);
                 return 'Dr. ' . $name;
             }));
         $entity->set('name', 'Jones');
         $this->assertEquals('Dr. Jones', $entity->get('name'));
         $this->assertEquals('Dr. Jones', $entity->get('name'));
     }
+
+    /**
+     * Tests get with custom getter
+     *
+     * @return void
+     */
+    public function testGetCustomGettersAfterSet()
+    {
+        $entity = $this->getMock('\Cake\ORM\Entity', ['_getName']);
+        $entity->expects($this->exactly(2))->method('_getName')
+            ->will($this->returnCallback(function ($name) {
+                return 'Dr. ' . $name;
+            }));
+        $entity->set('name', 'Jones');
+        $this->assertEquals('Dr. Jones', $entity->get('name'));
+        $this->assertEquals('Dr. Jones', $entity->get('name'));
+
+        $entity->set('name', 'Mark');
+        $this->assertEquals('Dr. Mark', $entity->get('name'));
+        $this->assertEquals('Dr. Mark', $entity->get('name'));
+    }
+
+    /**
+     * Tests that the get cache is cleared by unsetProperty.
+     *
+     * @return void
+     */
+    public function testGetCacheClearedByUnset()
+    {
+        $entity = $this->getMock('\Cake\ORM\Entity', ['_getName']);
+        $entity->expects($this->any())->method('_getName')
+            ->will($this->returnCallback(function ($name) {
+                return 'Dr. ' . $name;
+            }));
+        $entity->set('name', 'Jones');
+        $this->assertEquals('Dr. Jones', $entity->get('name'));
+
+        $entity->unsetProperty('name');
+        $this->assertEquals('Dr. ', $entity->get('name'));
+    }
+
 
     /**
      * Test magic property setting with no custom setter
