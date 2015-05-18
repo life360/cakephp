@@ -70,7 +70,7 @@ class Cache {
  *
  * @var array
  */
-	public static $_engines = array();
+	protected static $_engines = array();
 
 /**
  * Set the cache configuration to use. config() can

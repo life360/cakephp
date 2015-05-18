@@ -39,7 +39,7 @@ class MemcacheEngine extends CacheEngine {
  *
  * @var Memcache
  */
-	public $_Memcache = null;
+	protected $_Memcache = null;
 
 /**
  * Settings
