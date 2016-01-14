@@ -110,7 +110,8 @@ class MemcachedEngine extends CacheEngine {
 		if (!$this->settings['persistent']) {
 			$this->_Memcached = new Memcached();
 		} else {
-			$this->_Memcached = new Memcached((string)$this->settings['persistent']);
+			$sPersistentId = implode(',', $this->settings['servers']); // life360 patch to allow for multiple addresses in persistent pool
+			$this->_Memcached = new Memcached($sPersistentId);
 		}
 		$this->_setOptions();
 
